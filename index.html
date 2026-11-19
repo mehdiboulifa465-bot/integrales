@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Aires et intégrales</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://www.geogebra.org/apps/deployggb.js"></script>
+<style>
+*{box-sizing:border-box}
+body{font-family:"Segoe UI",Arial,sans-serif;background:linear-gradient(180deg,#1e1b4b,#4338ca);min-height:100vh;margin:0;padding:12px;color:#1f2937}
+.container{max-width:760px;margin:auto}
+h1{text-align:center;color:#fde68a;font-size:22px;margin:0 0 10px}
+.card{background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.center{text-align:center}
+button,select,input{font-size:16px;padding:8px 12px;border-radius:8px;border:1px solid #c7d2fe}
+button{background:#4f46e5;color:#fff;border:none;cursor:pointer}
+button.secondary{background:#e0e7ff;color:#3730a3}
+.row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center;margin-top:10px}
+#ggb{width:100%;max-width:700px;margin:auto;min-height:320px}
+.exercise{font-size:24px;text-align:center;padding:8px 0;overflow-x:auto}
+.statement{text-align:center;color:#4b5563;margin-bottom:4px}
+.answer{display:flex;gap:8px;justify-content:center;align-items:center;margin-top:10px;flex-wrap:wrap}
+.answer input{width:110px;text-align:center;font-size:20px}
+.feedback{margin-top:10px;padding:12px;border-radius:8px;display:none;line-height:1.9;overflow-x:auto}
+.ok{background:#dcfce7;color:#166534}.ko{background:#fee2e2;color:#991b1b}
+.step{display:block;margin:4px 0}
+a.back{color:#fde68a;display:block;text-align:center;margin-bottom:8px}
+.hint{font-size:13px;color:#6b7280;text-align:center;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>📐 Aires et intégrales</h1>
+<a class="back" href="index.html">⬅ Retour aux fractions</a>
+
+<div class="card">
+  <div class="row" style="margin-top:0">
+    <label>Type :
+      <select id="mode" onchange="newExercise()">
+        <option value="all">🎲 Mélange</option>
+        <option value="poly">Polynômes</option>
+        <option value="between">Entre deux courbes</option>
+        <option value="sign">Changement de signe</option>
+        <option value="sqrt">Racine carrée</option>
+        <option value="inv">1/x (logarithme)</option>
+        <option value="exp">Exponentielle</option>
+        <option value="trig">Sinus / cosinus</option>
+      </select>
+    </label>
+  </div>
+  <div class="statement" id="statement"></div>
+  <div class="exercise" id="exercise"></div>
+  <div id="ggb"></div>
+  <div class="answer" id="answerBox"></div>
+  <div class="row">
+    <button onclick="check()">✅ Valider</button>
+    <button class="secondary" onclick="showSolution()">💡 Solution</button>
+    <button class="secondary" onclick="newExercise()">Suivant ➜</button>
+  </div>
+  <div class="feedback" id="feedback"></div>
+  <div class="center" style="margin-top:8px;color:#6b7280">Score : <b id="score">0</b> / <b id="total">0</b></div>
+</div>
+</div>
+
+<script>
+const rnd=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+const pick=a=>a[rnd(0,a.length-1)];
+const gcd=(a,b)=>b===0?Math.abs(a):gcd(b,a%b);
+function simplify(n,d){if(d<0){n=-n;d=-d}const g=gcd(n,d)||1;return[n/g,d/g]}
+const fr=(n,d)=>{[n,d]=simplify(n,d);return d===1?`${n}`:n<0?`-\\dfrac{${-n}}{${d}}`:`\\dfrac{${n}}{${d}}`};
+
+/* ---------- Polynômes : tableau [a0,a1,a2,a3] ---------- */
+function polyTex(c){
+  let s="";
+  for(let k=c.length-1;k>=0;k--){
+    const a=c[k];if(!a)continue;
+    const abs=Math.abs(a);
+    const term=k===0?`${abs}`:((abs===1?"":abs)+(k===1?"x":`x^{${k}}`));
+    s+=(s===""?(a<0?"-":""):(a<0?"-":"+"))+term;
+  }
+  return s||"0";
+}
+function polyGGB(c){
+  let s="";
+  for(let k=c.length-1;k>=0;k--){
+    const a=c[k];if(!a)continue;
+    s+=(a<0?"-":(s===""?"":"+"))+Math.abs(a)+(k===0?"":(k===1?"*x":`*x^${k}`));
+  }
+  return s||"0";
+}
+const evalP=(c,x)=>c.reduce((s,a,k)=>s+a*Math.pow(x,k),0);
+function polyInt(c,A,B){ // intégrale exacte (fraction)
+  const D=60;let num=0;
+  c.forEach((a,k)=>{num+=a*(Math.pow(B,k+1)-Math.pow(A,k+1))*(D/(k+1))});
+  return simplify(num,D);
+}
+function primTex(c){
+  let s="";
+  c.forEach((a,k)=>{if(!a)return;
+    const[nn,dd]=simplify(a,k+1);
+    const coef=dd===1?(Math.abs(nn)===1?"":Math.abs(nn)):`\\dfrac{${Math.abs(nn)}}{${dd}}`;
+    s+=(s===""?(nn<0?"-":""):(nn<0?"-":"+"))+coef+(k+1===1?"x":`x^{${k+1}}`);
+  });
+  return s;
+}
+// racines entières d'un polynôme sur [-6,6]
+function intRoots(c){const r=[];for(let x=-6;x<=6;x++)if(evalP(c,x)===0)r.push(x);return r}
+
+/* ---------- Générateurs ----------
+   Un exercice = {
+     tex, statement, curves:[{ggb,color}], shade:[commandes GeoGebra de remplissage],
+     view:[xmin,xmax,ymin,ymax],
+     kind:"frac" | "ln" | "exp" | "decimal",
+     ans:{n,d} ou valeur, solution: html
+   } */
+
+function genPoly(){
+  const type=rnd(0,2);let c,A,B;
+  if(type===0){A=rnd(0,2);B=A+rnd(2,4);c=[rnd(1,4),rnd(1,3),0,0]}
+  else if(type===1){A=rnd(0,2);B=A+rnd(1,3);c=[rnd(0,4),0,rnd(1,3),0]}
+  else{A=0;B=rnd(2,4);c=[rnd(1,4),rnd(1,3),rnd(1,2),0]}
+  const[n,d]=polyInt(c,A,B);
+  const ym=Math.max(evalP(c,A),evalP(c,B))*1.4+2;
+  return{
+    statement:"Aire sous la courbe de f entre x = "+A+" et x = "+B+". Réponse : fraction irréductible.",
+    tex:`\\mathcal{A}=\\int_{${A}}^{${B}}\\left(${polyTex(c)}\\right)dx`,
+    curves:[{ggb:polyGGB(c),color:[220,38,38]}],
+    shade:[`Integral(c1,${A},${B})`,[79,70,229]],
+    view:[-1,B+2,-1,ym],kind:"frac",ans:{n,d},
+    solution:`<span class="step">$F(x)=${primTex(c)}$</span><span class="step">$\\mathcal{A}=F(${B})-F(${A})=${fr(n,d)}$ u.a.</span>`
+  };
+}
+
+function genBetween(){
+  // f(x)=ax+b au-dessus de g(x)=cx²  sur [0,B] ou entre 2 paraboles
+  let f,g,A=0,B;
+  if(rnd(0,1)){ // droite au-dessus d'une parabole x² entre 0 et B où x<=h(x)
+    const m=rnd(2,4);f=[0,m,0,0];g=[0,0,1,0];B=m; // x² ≤ m x sur [0,m]
+  }else{
+    const k=rnd(2,4);f=[k,0,0,0];g=[0,0,1,0];B=rnd(1,Math.floor(Math.sqrt(k)));B=Math.max(1,B); // x² ≤ k sur [0,B]
+  }
+  const diff=f.map((v,i)=>v-g[i]);
+  const[n,d]=polyInt(diff,A,B);
+  return{
+    statement:"Aire entre les deux courbes, de x = "+A+" à x = "+B+". Réponse : fraction irréductible.",
+    tex:`f(x)=${polyTex(f)}\\quad g(x)=${polyTex(g)}\\quad \\mathcal{A}=\\int_{${A}}^{${B}}(f-g)\\,dx`,
+    curves:[{ggb:polyGGB(f),color:[220,38,38]},{ggb:polyGGB(g),color:[16,120,60]}],
+    shade:[`Integral(c1,c2,${A},${B})`,[79,70,229]],
+    view:[-1,B+2,-1,Math.max(evalP(f,B),evalP(g,B))*1.5+2],kind:"frac",ans:{n,d},
+    solution:`<span class="step">$f-g=${polyTex(diff)}$</span><span class="step">$F(x)=${primTex(diff)}$</span><span class="step">$\\mathcal{A}=F(${B})-F(${A})=${fr(n,d)}$ u.a.</span>`
+  };
+}
+
+function genSign(){
+  // x(x-a)  ou  x²-a² : change de signe ; aire géométrique = somme des |intégrales|
+  const a=rnd(1,3),b=a+rnd(1,2);
+  // f(x)=(x-a)(x-b)... change de signe en a et b sur [0,b+?]
+  const c=[a*b,-(a+b),1,0]; // x²-(a+b)x+ab
+  const A=0,B=b+1;
+  const[n1,d1]=polyInt(c,A,a),[n2,d2]=polyInt(c,a,b),[n3,d3]=polyInt(c,b,B);
+  // somme des valeurs absolues
+  const D=d1*d2*d3;
+  let tot=Math.abs(n1)*(D/d1)+Math.abs(n2)*(D/d2)+Math.abs(n3)*(D/d3);
+  const[n,d]=simplify(tot,D);
+  return{
+    statement:"La fonction change de signe. Calcule l'AIRE GÉOMÉTRIQUE entre la courbe et l'axe des abscisses, de x = "+A+" à x = "+B+". Réponse : fraction irréductible.",
+    tex:`f(x)=${polyTex(c)}\\qquad \\mathcal{A}=\\int_{${A}}^{${B}}|f(x)|\\,dx`,
+    curves:[{ggb:polyGGB(c),color:[220,38,38]}],
+    shade:[`Integral(c1,${A},${B})`,[79,70,229]],
+    view:[-1,B+1,Math.min(evalP(c,(a+b)/2),0)*1.6-1,Math.max(evalP(c,A),evalP(c,B))*1.4+2],kind:"frac",ans:{n,d},
+    solution:`<span class="step">Racines : $x=${a}$ et $x=${b}$</span>`+
+      `<span class="step">$\\int_{${A}}^{${a}}f=${fr(n1,d1)}$ ; $\\int_{${a}}^{${b}}f=${fr(n2,d2)}$ ; $\\int_{${b}}^{${B}}f=${fr(n3,d3)}$</span>`+
+      `<span class="step">$\\mathcal{A}=\\left|${fr(n1,d1)}\\right|+\\left|${fr(n2,d2)}\\right|+\\left|${fr(n3,d3)}\\right|=${fr(n,d)}$ u.a.</span>`
+  };
+}
+
+function genSqrt(){
+  // ∫_0^B √x dx = (2/3) B^(3/2) ; B carré parfait
+  const r=rnd(1,3),B=r*r,k=rnd(1,3);
+  const[n,d]=simplify(2*k*r*B,3);
+  return{
+    statement:"Aire sous la courbe de x ↦ "+(k===1?"":k)+"√x entre 0 et "+B+". Réponse : fraction irréductible.",
+    tex:`\\mathcal{A}=\\int_{0}^{${B}}${k===1?"":k}\\sqrt{x}\\,dx`,
+    curves:[{ggb:`${k}*sqrt(x)`,color:[220,38,38]}],
+    shade:[`Integral(c1,0,${B})`,[79,70,229]],
+    view:[-1,B+2,-1,k*r*1.5+2],kind:"frac",ans:{n,d},
+    solution:`<span class="step">$F(x)=${k===1?"":k}\\cdot\\dfrac{2}{3}x^{3/2}$</span><span class="step">$\\mathcal{A}=F(${B})-F(0)=${fr(n,d)}$ u.a.</span>`
+  };
+}
+
+function genInv(){
+  // ∫_1^e^m k/x dx = k m   (entier) ; borne e^m affichée
+  const m=rnd(1,3),k=rnd(1,4);
+  return{
+    statement:"Aire sous la courbe de x ↦ "+k+"/x entre 1 et e"+(m===1?"":"^"+m)+". Réponse : un entier (laisse le dénominateur vide).",
+    tex:`\\mathcal{A}=\\int_{1}^{e^{${m}}}\\dfrac{${k}}{x}\\,dx`,
+    curves:[{ggb:`${k}/x`,color:[220,38,38]}],
+    shade:[`Integral(c1,1,exp(${m}))`,[79,70,229]],
+    view:[-1,Math.exp(m)+2,-1,k+2],kind:"frac",ans:{n:k*m,d:1},
+    solution:`<span class="step">$F(x)=${k}\\ln x$</span><span class="step">$\\mathcal{A}=${k}\\ln(e^{${m}})-${k}\\ln 1=${k*m}$ u.a.</span>`
+  };
+}
+
+function genExp(){
+  // ∫_0^B k e^x dx = k(e^B-1) ; réponse en nombre décimal arrondi à 0,01
+  const B=rnd(1,2),k=rnd(1,3);
+  const val=k*(Math.exp(B)-1);
+  return{
+    statement:"Aire sous la courbe de x ↦ "+k+"eˣ entre 0 et "+B+". Réponse arrondie au centième (utilise . ou ,).",
+    tex:`\\mathcal{A}=\\int_{0}^{${B}}${k}e^{x}\\,dx`,
+    curves:[{ggb:`${k}*exp(x)`,color:[220,38,38]}],
+    shade:[`Integral(c1,0,${B})`,[79,70,229]],
+    view:[-1,B+2,-1,k*Math.exp(B)*1.4+1],kind:"decimal",ans:val,
+    solution:`<span class="step">$F(x)=${k}e^{x}$</span><span class="step">$\\mathcal{A}=${k}(e^{${B}}-1)\\approx ${val.toFixed(2)}$ u.a.</span>`
+  };
+}
+
+function genTrig(){
+  // ∫_0^{π} k sin x dx = 2k ; ∫_0^{π/2} k cos x dx = k
+  const k=rnd(1,4);
+  if(rnd(0,1)){
+    return{
+      statement:"Aire sous la courbe de x ↦ "+k+"sin x entre 0 et π. Réponse : un entier (laisse le dénominateur vide).",
+      tex:`\\mathcal{A}=\\int_{0}^{\\pi}${k}\\sin x\\,dx`,
+      curves:[{ggb:`${k}*sin(x)`,color:[220,38,38]}],
+      shade:[`Integral(c1,0,pi)`,[79,70,229]],
+      view:[-1,4.5,-1.5,k+1.5],kind:"frac",ans:{n:2*k,d:1},
+      solution:`<span class="step">$F(x)=-${k}\\cos x$</span><span class="step">$\\mathcal{A}=-${k}\\cos\\pi+${k}\\cos 0=${2*k}$ u.a.</span>`
+    };
+  }
+  return{
+    statement:"Aire sous la courbe de x ↦ "+k+"cos x entre 0 et π/2. Réponse : un entier (laisse le dénominateur vide).",
+    tex:`\\mathcal{A}=\\int_{0}^{\\pi/2}${k}\\cos x\\,dx`,
+    curves:[{ggb:`${k}*cos(x)`,color:[220,38,38]}],
+    shade:[`Integral(c1,0,pi/2)`,[79,70,229]],
+    view:[-1,3,-1.5,k+1.5],kind:"frac",ans:{n:k,d:1},
+    solution:`<span class="step">$F(x)=${k}\\sin x$</span><span class="step">$\\mathcal{A}=${k}\\sin\\frac{\\pi}{2}-${k}\\sin 0=${k}$ u.a.</span>`
+  };
+}
+
+const GEN={poly:genPoly,between:genBetween,sign:genSign,sqrt:genSqrt,inv:genInv,exp:genExp,trig:genTrig};
+
+/* ---------- État ---------- */
+let cur=null,answered=false,good=0,total=0,api=null,ready=false;
+
+function newExercise(){
+  const m=document.getElementById("mode").value;
+  const key=m==="all"?pick(Object.keys(GEN)):m;
+  cur=GEN[key]();answered=false;
+  document.getElementById("statement").textContent=cur.statement;
+  katex.render(cur.tex,document.getElementById("exercise"),{throwOnError:false});
+  const box=document.getElementById("answerBox");
+  if(cur.kind==="frac"){
+    box.innerHTML=`<span>Aire =</span><input type="text" id="ansNum" placeholder="num."><span>/</span><input type="text" id="ansDen" placeholder="dén.">`;
+  }else{
+    box.innerHTML=`<span>Aire ≈</span><input type="text" id="ansDec" placeholder="0,00">`;
+  }
+  document.getElementById("feedback").style.display="none";
+  draw();
+}
+
+/* ---------- GeoGebra : aucune vue Algèbre, aucune valeur affichée ---------- */
+function draw(){
+  if(!ready)return;
+  api.reset();
+  cur.curves.forEach((cv,i)=>{
+    const name="c"+(i+1);
+    api.evalCommand(`${name}(x)=${cv.ggb}`);
+    api.setColor(name,cv.color[0],cv.color[1],cv.color[2]);
+    api.setLineThickness(name,6);
+    api.setLabelVisible(name,false);
+  });
+  api.evalCommand(`aire=${cur.shade[0]}`);
+  const col=cur.shade[1];
+  api.setColor("aire",col[0],col[1],col[2]);
+  api.setFilling("aire",0.45);
+  api.setLabelVisible("aire",false);
+  api.setCoordSystem(cur.view[0],cur.view[1],cur.view[2],cur.view[3]);
+}
+
+/* ---------- Validation ---------- */
+function parseI(s){s=s.trim().replace(/[−–—]/g,"-").replace(/\s+/g,"");return /^-?\d+$/.test(s)?parseInt(s,10):NaN}
+function show(cls,html){
+  const fb=document.getElementById("feedback");
+  fb.className="feedback "+cls;
+  fb.innerHTML=html.replace(/\$([^$]+)\$/g,(m,t)=>katex.renderToString(t,{throwOnError:false}));
+  fb.style.display="block";
+}
+function check(){
+  if(answered)return;
+  let okAns=false;
+  if(cur.kind==="frac"){
+    const uN=parseI(document.getElementById("ansNum").value);
+    const dRaw=document.getElementById("ansDen").value.trim();
+    const uD=dRaw===""?1:parseI(dRaw);
+    if(isNaN(uN)||isNaN(uD)||uD===0){show("ko","Entre un numérateur et un dénominateur valides (dénominateur vide = entier).");return}
+    const[un,ud]=simplify(uN,uD);
+    okAns=(un===cur.ans.n&&ud===cur.ans.d);
+  }else{
+    const v=parseFloat(document.getElementById("ansDec").value.replace(",","."));
+    if(isNaN(v)){show("ko","Entre un nombre valide.");return}
+    okAns=Math.abs(v-cur.ans)<=0.011;
+  }
+  answered=true;total++;
+  if(okAns){good++;show("ok","✅ Bravo !"+cur.solution)}
+  else show("ko","❌ Ce n'est pas la bonne réponse."+cur.solution);
+  document.getElementById("score").textContent=good;
+  document.getElementById("total").textContent=total;
+}
+function showSolution(){
+  if(!answered){answered=true;total++;document.getElementById("total").textContent=total}
+  show("ok","💡 Solution :"+cur.solution);
+}
+
+/* ---------- Chargement ---------- */
+window.addEventListener("load",()=>{
+  const w=Math.min(700,window.innerWidth-50);
+  const params={
+    appName:"classic",width:w,height:320,
+    perspective:"G",               // G = Graphique seul (PAS de vue Algèbre)
+    showToolBar:false,showAlgebraInput:false,showMenuBar:false,
+    showToolBarHelp:false,showResetIcon:false,enableRightClick:false,
+    enableLabelDrags:false,enableShiftDragZoom:true,
+    appletOnLoad:function(a){api=a;ready=true;draw()}
+  };
+  new GGBApplet(params,true).inject("ggb");
+  newExercise();
+});
+</script>
+</body>
+</html>
